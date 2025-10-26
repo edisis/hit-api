@@ -25,8 +25,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh """
-                    source ${VENV_PATH}/bin/activate
-                    pytest -v --disable-warnings --maxfail=1
+                    ${VENV_PATH}/bin/pytest -v --disable-warnings --maxfail=1
                 """
             }
         }
