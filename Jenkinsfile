@@ -12,7 +12,7 @@ pipeline {
 
         stage('Run API Tests') {
             steps {
-                sh '. .venv/bin/activate && pytest --maxfail=1 --disable-warnings -q --html=reports/test-report.html'
+                sh '. .venv/bin/activate && pytest --maxfail=1 --disable-warnings -q'
             }
         }
     }
