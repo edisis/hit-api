@@ -1,39 +1,25 @@
 pipeline {
     agent any
-
-    environment {
-        VENV_PATH = ".venv"
-    }
-
+    
     stages {
-        stage('Checkout') {
+        stage('Setup Python Env') {
             steps {
-                checkout scm
+                sh 'python3 -m venv .venv'
+                sh '. .venv/bin/activate && pip install --upgrade pip'
+                sh '. .venv/bin/activate && pip install -r requirements.txt'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Run API Tests') {
             steps {
-                sh """
-                    python3 -m venv ${VENV_PATH}
-                    ${VENV_PATH}/bin/pip install --upgrade pip
-                    ${VENV_PATH}/bin/pip install -r requirements.txt
-                """
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                sh """
-                    ${VENV_PATH}/bin/pytest -v --disable-warnings --maxfail=1
-                """
+                sh '. .venv/bin/activate && pytest --maxfail=1 --disable-warnings -q --html=reports/test-report.html'
             }
         }
     }
 
     post {
-        always { echo 'Pipeline Completed' }
-        success { echo 'All Test Passed' }
-        failure { echo 'Some Tests Failed' }
+        always {
+            archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
+        }
     }
 }
