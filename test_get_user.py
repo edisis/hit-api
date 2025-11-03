@@ -2,8 +2,8 @@ import requests
 import pytest
 
 headers = {
-    "Content-Type": "application/json"
-    # Hapus x-api-key karena reqres.in tidak butuh API key
+    "Content-Type": "application/json",
+    "x-api-key": "reqres-free-v1"
 }
 
 # @pytest.mark.parametrize('page', [1, 2, 3])
