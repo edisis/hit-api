@@ -2,9 +2,9 @@ pipeline {
     agent any
     
     stages {
-        stage('Setup Python Environment') {
+        stage('Install Dependencies') {
             steps {
-                sh 'docker exec python-runner pip install -r requirements.txt'
+                sh 'docker exec python-runner pip install requests pytest allure-pytest'
             }
         }
 
