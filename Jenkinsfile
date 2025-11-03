@@ -1,33 +1,21 @@
 pipeline {
     agent any
-
-    options {
-        skipDefaultCheckout(true)
-    }
-
+    
     stages {
-        stage('Checkout') {
+        stage('Setup Python') {
             steps {
-                checkout scm
+                sh '''
+                    apt update && apt install -y python3 python3-pip python3-venv
+                    python3 -m venv .venv
+                    . .venv/bin/activate && pip install --upgrade pip
+                    . .venv/bin/activate && pip install -r requirements.txt
+                '''
             }
         }
 
-        stage('Setup and Test') {
-            agent {
-                docker {
-                    image 'python:3.12-slim'
-                    args '--network jenkins-net'
-                }
-            }
+        stage('Run Tests') {
             steps {
-                sh '''
-                    apt-get update && apt-get install -y python3-venv
-                    python3 -m venv .venv
-                    . .venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pytest --maxfail=1 --disable-warnings -q --html=reports/report.html --self-contained-html
-                '''
+                sh '. .venv/bin/activate && pytest --maxfail=1 --disable-warnings -q'
             }
         }
     }
