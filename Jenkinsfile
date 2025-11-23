@@ -20,7 +20,7 @@ pipeline {
                 echo "Running pytest inside python-runner..."
                 sh '''
                     docker exec python-runner bash -c "
-                        . venv/bin/activate &&
+                        . .venv/bin/activate &&
                         pytest --maxfail=1 --disable-warnings -q
                     "
                 '''
