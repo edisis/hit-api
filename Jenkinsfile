@@ -8,7 +8,6 @@ pipeline {
             }
         }
 
-    stages {  
         stage('Setup Environment') {
             steps {
                 echo "Setting up virtual environment inside python-runner..."
@@ -22,6 +21,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Run Tests') {
             steps {
                 echo "Running pytest inside python-runner..."
@@ -46,6 +46,5 @@ pipeline {
         success {
             echo "All tests passed successfully."
         }
-    }
     }
 }
