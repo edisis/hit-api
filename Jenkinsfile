@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
     stages {  
         stage('Setup Environment') {
             steps {
@@ -39,5 +46,6 @@ pipeline {
         success {
             echo "All tests passed successfully."
         }
+    }
     }
 }
