@@ -7,23 +7,26 @@ pipeline {
 
     stages {
 
-        steps {
-            sh '''
-            docker exec python-runner bash -c "
-                pip install -r /var/jenkins_home/workspace/HitAPI/requirements.txt
-            "
-            '''
+        stage('Install Requirements') {
+            steps {
+                sh '''
+                docker exec python-runner bash -c "
+                    pip install -r /var/jenkins_home/workspace/HitAPI/requirements.txt
+                "
+                '''
+            }
         }
-    }
 
-    stage('Run Test With Allure') {
-        steps {
-            sh '''
-            docker exec python-runner bash -c "
-                pytest /var/jenkins_home/workspace/HitAPI/allure-results
-            "
-            '''
+        stage('Run Test With Allure') {
+            steps {
+                sh '''
+                docker exec python-runner bash -c "
+                    pytest --alluredir=/var/jenkins_home/workspace/HitAPI/allure-results /var/jenkins_home/workspace/HitAPI
+                "
+                '''
+            }
         }
+
     }
 
     post {
@@ -31,5 +34,5 @@ pipeline {
             allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
         }
     }
-    
+
 }
