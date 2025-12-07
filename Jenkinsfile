@@ -1,46 +1,35 @@
 pipeline {
     agent any
-    
+
+    tools {
+        allure 'allure'
+    }
+
     stages {
 
-        stage('Setup Environment') {
-            steps {
-                echo "Setting up virtual environment inside python-runner..."
-                sh '''
-                    docker exec python-runner bash -c "
-                        python3 -m venv .venv &&
-                        . .venv/bin/activate &&
-                        pip install --upgrade pip &&
-                        pip install -r requirements.txt
-                    "
-                '''
-            }
+        steps {
+            sh '''
+            docker exec python-runner bash -c "
+                pip install -r /var/jenkins_home/workspace/HitAPI/requirements.txt
+            "
+            '''
         }
+    }
 
-        stage('Run Tests') {
-            steps {
-                echo "Running pytest inside python-runner..."
-                sh '''
-                    docker exec python-runner bash -c "
-                        . .venv/bin/activate &&
-                        pytest --maxfail=1 --disable-warnings -q
-                    "
-                '''
-            }
+    stage('Run Test With Allure') {
+        steps {
+            sh '''
+            docker exec python-runner bash -c "
+                pytest /var/jenkins_home/workspace/HitAPI/allure-results
+            "
+            '''
         }
-
     }
 
     post {
         always {
-            echo "Pipeline execution completed."
-            archiveArtifacts artifacts: '**/reports/*.html', allowEmptyArchive: true
-        }
-        failure {
-            echo "Some tests failed."
-        }
-        success {
-            echo "All tests passed successfully."
+            allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
         }
     }
+    
 }
