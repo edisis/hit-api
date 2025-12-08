@@ -1,39 +1,53 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.13.9-slim'
-            args '--network jenkins-net -v jenkins_home:/var/jenkins_home'
-        }
+    agent any
+
+    environment {
+        TELEGRAM_BOT_TOKEN = '8313140175:AAFHhvYESd6PxhvweTsLZgcnHsGwdS2x6VM'
+        TELEGRAM_CHAT_ID  = '619908852'
+        WORKSPACE_PATH    = '/var/jenkins_home/workspace/HitAPI_Test'
     }
 
     stages {
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    cd /var/jenkins_home/workspace/HitAPI_Test@script
-                    pip install -r requirements.txt
-                '''
+                echo "Installing Python dependencies in docker container..."
+                sh """
+                    docker exec python-runner pip install -r ${WORKSPACE_PATH}/requirements.txt
+                """
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh '''
-                    cd /var/jenkins_home/workspace/HitAPI_Test@script
-                    pytest test_api.py -v --alluredir=allure-results
-                '''
+                echo "Running tests with Allure results..."
+                sh """
+                    docker exec python-runner pytest -v --alluredir=${WORKSPACE_PATH}/allure-results ${WORKSPACE_PATH}
+                """
             }
         }
 
-        stage('Generate Report & Kirim Telegram') {
+        stage('Generate Allure Report') {
+            steps {
+                echo "Generating Allure report..."
+                allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+            }
+        }
+
+        stage('Send Telegram Notification') {
             steps {
                 script {
-                    allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
-                    def message = "Build #${env.BUILD_NUMBER} selesai, lihat report: ${env.BUILD_URL}allure/"
+                    def status = currentBuild.result ?: 'SUCCESS'
+                    def message = """
+Build #${env.BUILD_NUMBER} for job ${env.JOB_NAME} finished with status: ${status}
+
+Allure Report: ${env.BUILD_URL}allure/
+Jenkins Console: ${env.BUILD_URL}console
+                    """.replaceAll("'", "'\\\\''")
+
                     sh """
                     curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
-                    -d chat_id=${TELEGRAM_CHAT_ID} \
-                    -d text='${message}'
+                        -d chat_id=${TELEGRAM_CHAT_ID} \
+                        -d text='${message}'
                     """
                 }
             }
@@ -43,10 +57,16 @@ pipeline {
     post {
         failure {
             script {
+                def message = """
+Build #${env.BUILD_NUMBER} for job ${env.JOB_NAME} FAILED!
+
+Jenkins Console: ${env.BUILD_URL}console
+                """.replaceAll("'", "'\\\\''")
+
                 sh """
                 curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
-                -d text='Build #${env.BUILD_NUMBER} gagal. Lihat console: ${env.BUILD_URL}console'
+                    -d chat_id=${TELEGRAM_CHAT_ID} \
+                    -d text='${message}'
                 """
             }
         }
