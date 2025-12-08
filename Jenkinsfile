@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        allure 'allure-manual'
-    }
-
     environment {
         TELEGRAM_BOT_TOKEN = '8313140175:AAFHhvYESd6PxhvweTsLZgcnHsGwdS2x6VM'
         TELEGRAM_CHAT_ID = '619908852'
@@ -14,18 +10,17 @@ pipeline {
         stage('Run Tests in Docker') {
             steps {
                 script {
-                    docker.image('python:3.13.9-slim').inside("--network jenkins-network") {
+                    docker.image('python:3.13.9-slim').inside("--network jenkins-net -v jenkins_home:/var/jenkins_home") {
                         stage('Install Dependencies') {
                             sh '''
-                                cd /var/jenkins_home/workspace/HitAPI_Test
-                                ls -la
+                                cd /var/jenkins_home/workspace/HitAPI_Test@script
                                 pip install -r requirements.txt
                             '''
                         }
                         
                         stage('Run Tests') {
                             sh '''
-                                cd /var/jenkins_home/workspace/HitAPI_Test
+                                cd /var/jenkins_home/workspace/HitAPI_Test@script
                                 pytest test_api.py -v --alluredir=allure-results
                             '''
                         }
@@ -40,18 +35,12 @@ pipeline {
                     // Generate Allure Report
                     allure includeProperties: false, 
                            jdk: '', 
-                           properties: [
-                               [key: 'allure.report.name', value: 'Report nih'], 
-                               [key: 'allure.report.title', value: 'Test Execution Report']
-                           ], 
-                           resultPolicy: 'LEAVE_AS_IS', 
                            results: [[path: 'allure-results']]
-                    
-                    // Prepare notif
+
+                    // Siapkan pesan Telegram
                     def allureReportUrl = "${env.BUILD_URL}allure/"
                     def status = currentBuild.result ?: 'SUCCESS'
                     
-                    // test summary
                     def summary = ''
                     try {
                         if (fileExists('allure-report/widgets/summary.json')) {
@@ -63,7 +52,6 @@ Passed: ${summaryJson.statistic.passed}
 Failed: ${summaryJson.statistic.failed}
 Broken: ${summaryJson.statistic.broken}
 Skipped: ${summaryJson.statistic.skipped}
-
 """
                         }
                     } catch (Exception e) {
@@ -71,11 +59,10 @@ Skipped: ${summaryJson.statistic.skipped}
                         summary = ""
                     }
                     
-                    // Bikin pesen chat
                     def message = """
 Test Automation Report
 
-Automation yang enih:  ${env.JOB_NAME}
+Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 Status: ${status}
 Duration: ${currentBuild.durationString}
@@ -85,7 +72,7 @@ ${summary}Allure Report: ${allureReportUrl}
 Jenkins Build: ${env.BUILD_URL}
                     """.replaceAll("'", "'\\\\''")
                     
-                    // Kirim Telegram
+                    // Kirim ke Telegram
                     sh """
                     curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
                     -d chat_id=${TELEGRAM_CHAT_ID} \
@@ -99,23 +86,21 @@ Jenkins Build: ${env.BUILD_URL}
     
     post {
         failure {
-            node('') {
-                script {
-                    def message = """
+            script {
+                def message = """
 Build Failed
 
 Job: ${env.JOB_NAME}
 Build: #${env.BUILD_NUMBER}
 
 Console: ${env.BUILD_URL}console
-                    """.replaceAll("'", "'\\\\''")
-                    
-                    sh """
-                    curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
-                    -d chat_id=${TELEGRAM_CHAT_ID} \
-                    -d text='${message}'
-                    """
-                }
+                """.replaceAll("'", "'\\\\''")
+                
+                sh """
+                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+                -d chat_id=${TELEGRAM_CHAT_ID} \
+                -d text='${message}'
+                """
             }
         }
     }
