@@ -2,37 +2,121 @@ pipeline {
     agent any
 
     tools {
-        allure 'allure'
+        allure 'allure-manual'
+    }
+
+    environment {
+        TELEGRAM_BOT_TOKEN = '8313140175:AAFHhvYESd6PxhvweTsLZgcnHsGwdS2x6VM'
+        TELEGRAM_CHAT_ID = '619908852'
     }
 
     stages {
-
-        stage('Install Requirements') {
+        stage('Run Tests in Docker') {
             steps {
-                sh '''
-                docker exec python-runner bash -c "
-                    pip install -r /var/jenkins_home/workspace/HitAPI_Test/requirements.txt
-                "
-                '''
+                script {
+                    docker.image('python:3.13.9-slim').inside("--network jenkins-network") {
+                        stage('Install Dependencies') {
+                            sh '''
+                                cd /var/jenkins_home/workspace/HitAPI_Test
+                                ls -la
+                                pip install -r requirements.txt
+                            '''
+                        }
+                        
+                        stage('Run Tests') {
+                            sh '''
+                                cd /var/jenkins_home/workspace/HitAPI_Test
+                                pytest test_api.py -v --alluredir=allure-results
+                            '''
+                        }
+                    }
+                }
             }
         }
-
-        stage('Run Test With Allure') {
+        
+        stage('Generate Report & Kirim Telegram') {
             steps {
-                sh '''
-                docker exec python-runner bash -c "
-                    pytest --alluredir=/var/jenkins_home/workspace/HitAPI_Test/allure-results /var/jenkins_home/workspace/HitAPI_Test
-                "
-                '''
+                script {
+                    // Generate Allure Report
+                    allure includeProperties: false, 
+                           jdk: '', 
+                           properties: [
+                               [key: 'allure.report.name', value: 'Report nih'], 
+                               [key: 'allure.report.title', value: 'Test Execution Report']
+                           ], 
+                           resultPolicy: 'LEAVE_AS_IS', 
+                           results: [[path: 'allure-results']]
+                    
+                    // Prepare notif
+                    def allureReportUrl = "${env.BUILD_URL}allure/"
+                    def status = currentBuild.result ?: 'SUCCESS'
+                    
+                    // test summary
+                    def summary = ''
+                    try {
+                        if (fileExists('allure-report/widgets/summary.json')) {
+                            def summaryJson = readJSON file: 'allure-report/widgets/summary.json'
+                            summary = """
+Test Summary:
+Total: ${summaryJson.statistic.total}
+Passed: ${summaryJson.statistic.passed}
+Failed: ${summaryJson.statistic.failed}
+Broken: ${summaryJson.statistic.broken}
+Skipped: ${summaryJson.statistic.skipped}
+
+"""
+                        }
+                    } catch (Exception e) {
+                        echo "Could not read summary: ${e.message}"
+                        summary = ""
+                    }
+                    
+                    // Bikin pesen chat
+                    def message = """
+Test Automation Report
+
+Automation yang enih:  ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Status: ${status}
+Duration: ${currentBuild.durationString}
+Date: ${new Date().format('dd-MM-yyyy HH:mm')}
+
+${summary}Allure Report: ${allureReportUrl}
+Jenkins Build: ${env.BUILD_URL}
+                    """.replaceAll("'", "'\\\\''")
+                    
+                    // Kirim Telegram
+                    sh """
+                    curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+                    -d chat_id=${TELEGRAM_CHAT_ID} \
+                    -d disable_web_page_preview=false \
+                    -d text='${message}'
+                    """
+                }
             }
         }
-
     }
-
+    
     post {
-        always {
-            allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+        failure {
+            node('') {
+                script {
+                    def message = """
+Build Failed
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+
+Console: ${env.BUILD_URL}console
+                    """.replaceAll("'", "'\\\\''")
+                    
+                    sh """
+                    curl -s -X POST https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage \
+                    -d chat_id=${TELEGRAM_CHAT_ID} \
+                    -d text='${message}'
+                    """
+                }
+            }
         }
     }
-
 }
