@@ -11,7 +11,7 @@ pipeline {
             steps {
                 sh '''
                 docker exec python-runner bash -c "
-                    pip install -r '/var/jenkins_home/workspace/HitAPI_Test@script/requirements.txt'
+                    pip install -r /var/jenkins_home/workspace/HitAPI_Test/requirements.txt
                 "
                 '''
             }
@@ -21,7 +21,7 @@ pipeline {
             steps {
                 sh '''
                 docker exec python-runner bash -c "
-                    pytest --alluredir='/var/jenkins_home/workspace/HitAPI_Test@script/allure-results' '/var/jenkins_home/workspace/HitAPI_Test@script'
+                    pytest --alluredir=/var/jenkins_home/workspace/HitAPI_Test/allure-results /var/jenkins_home/workspace/HitAPI_Test
                 "
                 '''
             }
